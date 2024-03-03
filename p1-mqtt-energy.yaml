@@ -1,0 +1,141 @@
+# ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+# ┃                                     MQTT Sensors Configuration                                 ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ This file defines various sensors to monitor and collect data within Home Assistant.           ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ File: p1-mqtt-energy.yaml                                                                      ┃
+# ┃ Created: March 03, 2024                                                                        ┃
+# ┃ By: S.Incze                                                                                    ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ Note: Please be cautious while editing this file to maintain the correct YAML syntax.          ┃
+# ┃                                                                                                ┃
+# ┃ The P1 meter is connected to a WEMOS D1 running ESPEASY 20240229 - MEGA                        ┃
+# ┃ In EspEASY:                                                                                    ┃
+# ┃ - A Communication - Serial Server retrieves the values from the P1 meter                       ┃
+# ┃                                                                                                ┃
+# ┃ Domoticz connects to this service so unfortunately HomeAssistant needs to be integrated in a   ┃
+# ┃ different way. As I want to run both systems simultaniously now                                ┃
+# ┃                                                                                                ┃
+# ┃ Luckily if you configure the Communication - Serial Server with:                               ┃
+# ┃ - Event processing:: Generic                                                                   ┃
+# ┃ - And add the following rule:                                                                  ┃
+# ┃                                                                                                ┃
+# ┃ on !Serial* do // Include * to process string values                                           ┃
+# ┃   PublishR,ESP_Easy/%sysname%/P1,%eventvalue%                                                  ┃
+# ┃ endon                                                                                          ┃
+# ┃                                                                                                ┃
+# ┃ A message will end up in your MQTT Broker that we can interpret to devices with the code below ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ In my configuration.yaml I have the following directive:                                       ┃
+# ┃                                                                                                ┃
+# ┃ mqtt:                                                                                          ┃ 
+# ┃   sensor: !include_dir_merge_list mqtt/sensor                                                  ┃
+# ┃                                                                                                ┃
+# ┃ This means this file needs to be in /mqtt/sensor subdirectory                                  ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ For more information, visit: https://www.home-assistant.io/integrations/sensor/                ┃
+# ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+    - name: "Test-P1 Low Tariff Usage"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("1-0:1.8.1\((.*?)\*kWh\)", 0) | float }}'
+      unique_id: mqtt_low_tariff_usage
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class:  total_increasing
+
+    - name: "Test-P1 High Tariff Usage"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("1-0:1.8.2\((.*?)\*kWh\)", 0) | float }}'
+      unique_id: mqtt_high_tariff_usage
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class:  total_increasing
+
+    - name: "Test-P1 Low Tariff Return"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("1-0:2.8.1\((.*?)\*kWh\)", 0) | float }}'
+      unique_id: mqtt_low_tariff_return
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class:  total_increasing
+
+    - name: "Test-P1 High Tariff Return"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("1-0:2.8.2\((.*?)\*kWh\)", 0) | float }}'
+      unique_id: mqtt_high_tariff_return
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class:  total_increasing
+# -------------------------------------------------------------------------------------------------------
+    - name: "Test-P1 Actual Ccnsumption"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("1-0:1.7.0\((.*?)\*kW\)", 0) | float }}'
+      unique_id: mqtt_actual_consumption
+      unit_of_measurement: "kW"
+      device_class: power
+
+    - name: "Test-P1 Actual Return"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("1-0:2.7.0\((.*?)\*kW\)", 0) | float }}'
+      unique_id: mqtt_actual_return
+      unit_of_measurement: "kW"
+      device_class: power
+# -------------------------------------------------------------------------------------------------------
+# Voltage 
+# -------------------------------------------------------------------------------------------------------
+    - name: "Test-Voltage_L1"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("1-0:32.7.0\((.*?)\*V\)", 0) | float }}'
+      unit_of_measurement: "V"
+      device_class: power
+      unique_id: mqtt_voltage_l1
+
+    - name: "Test-Voltage_L2"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("1-0:52.7.0\((.*?)\*V\)", 0) | float }}'
+      unit_of_measurement: "V"
+      unique_id: mqtt_voltage_l2
+      device_class: power
+
+    - name: "Test-Voltage_L3"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("1-0:72.7.0\((.*?)\*V\)", 0) | float }}'
+      unit_of_measurement: "V"
+      device_class: power
+      unique_id: mqtt_voltage_l2
+# -------------------------------------------------------------------------------------------------------
+# Amps
+# -------------------------------------------------------------------------------------------------------
+    - name: "Test-P1 Current l1"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("1-0:31.7.0\((.*?)\*A\)", 0) | float }}'
+      unit_of_measurement: "A"     
+      device_class: current
+      unique_id: mqtt_current_l1      
+
+    - name: "Test-P1 Current l2"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("1-0:51.7.0\((.*?)\*A\)", 0) | float }}'
+      unit_of_measurement: "A"
+      device_class: current
+      unique_id: mqtt_current_l2
+
+    - name: "Test-P1 Current l3"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("1-0:71.7.0\((.*?)\*A\)", 0) | float }}'
+      unit_of_measurement: "A"
+      device_class: current
+      unique_id: mqtt_current_l3
+# -------------------------------------------------------------------------------------------------------
+# GAS 
+# -------------------------------------------------------------------------------------------------------
+    - name: "Test-Gas Consumption"
+      state_topic: "ESP_Easy/Watermeter/P1"
+      value_template: '{{ value | regex_findall_index("0-1:24.2.1\((.*?)\*m3\)", 0) | float }}'
+      unit_of_measurement: "m³"
+      device_class: gas
+      state_class: total_increasing
+      icon: mdi:meter-gas
+      unique_id: mqtt_gas
+# -------------------------------------------------------------------------------------------------------
