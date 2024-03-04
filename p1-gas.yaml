@@ -1,0 +1,34 @@
+# ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+# ┃                                     MQTT Sensors Configuration                                 ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ This file defines various sensors to monitor and collect data within Home Assistant.           ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ File: p1-gas.yaml                                                                              ┃
+# ┃ Created: March 03, 2024                                                                        ┃
+# ┃ By: S.Incze                                                                                    ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ Note: Please be cautious while editing this file to maintain the correct YAML syntax.          ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ In my configuration.yaml I have the following directive:                                       ┃
+# ┃                                                                                                ┃
+# ┃ mqtt:                                                                                          ┃ 
+# ┃   sensor: !include_dir_merge_list mqtt/sensor                                                  ┃
+# ┃                                                                                                ┃
+# ┃ This means this file needs to be in /mqtt/sensor subdirectory                                  ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ This file listens to domoticz/out. if Domoticz publishes a sensor and if the name is in the    ┃
+# ┃ value_json.name == '****' corresponds it will use it to create the sensor in HA.               ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ For more information, visit: https://www.home-assistant.io/integrations/sensor/                ┃
+# ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+    - name: "P1 Gas"
+      state_topic: "domoticz/out"
+      unique_id: p1_gasmeter
+      json_attributes_topic: "domoticz/out"
+      unit_of_measurement: m³
+      device_class: gas
+      state_class: total_increasing
+      icon: mdi:meter-gas
+      value_template: "{% if value_json.name == 'Gas' %}{{ value_json.svalue1 | float / 1000 }}{% endif %}"
+# -------------------------------------------------------------------------------------------------------
