@@ -1,0 +1,85 @@
+# ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+# ┃                                     RECORDER Configuration                                     ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ This file defines settings for the recorder of Home Asistant.                                  ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ File: recorder.yaml                                                                            ┃
+# ┃ Created: February 29, 2024                                                                     ┃
+# ┃ By: S.Incze                                                                                    ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ Note: Please be cautious while editing this file to maintain the correct YAML syntax.          ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ For more information, visit: https://www.home-assistant.io/integrations/recorder/              ┃
+# ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  purge_keep_days: 3
+  commit_interval: 2
+  include:
+    domains:
+      - sensor
+      - switch
+      - media_player
+    entities:
+      - sensor.watermeter_dz
+  exclude:
+    event_types:
+      - call_service
+#      - component_loaded
+#      - platform_discovered
+#      - service_registered
+    entities:
+      - sensor.low_tariff_usage
+      - sensor.high_tariff_usage
+      - sensor.low_tariff_return
+      - sensor.high_tariff_return
+      - sensor.actual_consumption
+      - sensor.actual_return
+#      - sensor.current_l1
+#      - sensor.current_l1
+#      - sensor.current_l3
+#      - sensor.usage_l1
+#      - sensor.usage_l2
+#      - sensor.usage_l3
+      - sensor.last_boot
+#      - sensor.date
+      - camera.front_door
+      - sensor.home_assistant_v2_db
+#      - sensor.home_assistant_v2_db_size
+      - sensor.memory_free
+      - sensor.memory_use
+      - sensor.memory_use_percent
+      - sensor.processor_use
+      - weather.openweathermap
+      - sensor.router_upload_dz
+    entity_globs:
+      - sensor.p1_*
+      - sensor.date*
+      - sensor.weather_*
+      - sensor.*_last_seen
+      - sensor.*_linkquality
+      - switch.motion_*_dz
+      - sensor.neo_usg_*
+      - sensor.plug_kodi_keuken_electric_*
+      - sensor.none_tasmota_alarm_energy_*
+#  exclude:
+#    domains:
+#      - device_tracker
+#      - media_player
+#      - uptime
+#      - time_date
+#      - worldclock
+#    entity_globs:
+#      - sensor.clock*
+#      - sensor.date*
+#      - sensor.glances*
+#      - sensor.load_*m
+#      - sensor.time*
+#      - sensor.uptime*
+#    entities:
+#      - camera.front_door
+#      - sensor.home_assistant_v2_db
+#      - sensor.memory_free
+#      - sensor.memory_use
+#      - sensor.memory_use_percent
+#      - sensor.processor_use
+#      - weather.openweathermap
