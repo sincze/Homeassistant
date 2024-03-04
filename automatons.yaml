@@ -1,0 +1,147 @@
+# ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+# ┃                                     MQTT Sensors Configuration                                 ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ This file defines various automations to have Homeassistant sync with Domoticz sensors         ┃
+# ┃ It also compresses the Home Assistant Database daily at 02:22:22                               ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ File: automations.yaml                                                                         ┃
+# ┃ Created: March 03, 2024                                                                        ┃
+# ┃ By: S.Incze                                                                                    ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ Note: Please be cautious while editing this file to maintain the correct YAML syntax.          ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ For more information, visit: https://www.home-assistant.io/integrations/automation/            ┃
+# ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+- id: e861e0479bb64ffca81ff5e10480b02a
+  alias: domoticz_switch_state
+  trigger:
+  - platform: mqtt
+    topic: domoticz/out
+  condition:
+  - condition: template
+    value_template: '{{ trigger.payload_json.dtype == "Light/Switch" }}'
+  action:
+  - service: mqtt.publish
+    data_template:
+      topic: homeassistant/switch/dz_switch_{{ trigger.payload_json.idx }}/state
+      payload_template: '{% if trigger.payload_json.nvalue == 1 %} On {% else %} Off
+        {% endif %}'
+  - condition: template
+    value_template: '{{ states("switch.dz_switch_"+trigger.payload_json.idx|string)
+      == "unknown" }}'
+  - service: mqtt.publish
+    data_template:
+      topic: homeassistant/switch/dz_switch_{{ trigger.payload_json.idx }}/config
+      payload_template: "{\n  \"name\": \"{{ trigger.payload_json.name|string }} (dz)\",\n
+        \ \"command_topic\": \"homeassistant/switch/dz_switch_{{ trigger.payload_json.idx|string
+        }}/power\",\n  \"state_topic\": \"homeassistant/switch/dz_switch_{{ trigger.payload_json.idx|string
+        }}/state\",\n  \"unique_id\": \"{{ trigger.payload_json.idx }}\",\n  \"payload_off\":
+        \"Off\",\n  \"payload_on\": \"On\"\n}"
+  initial_state: true
+- id: 79447ec344414ed89b50145f25d5bc99
+  alias: domoticz_switch_power
+  trigger:
+  - platform: mqtt
+    topic: homeassistant/switch/+/power
+  action:
+  - service: mqtt.publish
+    data_template:
+      topic: domoticz/in
+      payload_template: '{ "command": "switchlight", "idx": {{ trigger.topic.split("/")[-2]
+        }},"switchcmd": "{{ trigger.payload }}" }'
+  initial_state: true
+- id: 73272207b1864ebcb00a2228393aeadc
+  alias: domoticz_sensor_state_temp
+  trigger:
+  - platform: mqtt
+    topic: domoticz/out
+  condition:
+  - condition: template
+    value_template: '{{ trigger.payload_json.dtype == "Temp + Humidity" }}'
+  action:
+  - service: mqtt.publish
+    data_template:
+      topic: homeassistant/sensor/dz_sensor_{{ trigger.payload_json.idx }}/state
+      payload_template: '{{ trigger.payload_json.svalue1 }}'
+  - condition: template
+    value_template: '{{ states("sensor.dz_sensor_"+trigger.payload_json.idx|string)
+      == "unknown" }}'
+  - service: mqtt.publish
+    data_template:
+      topic: homeassistant/sensor/dz_sensor_{{ trigger.payload_json.idx }}/config
+      payload_template: "{ \"name\": \"{{ trigger.payload_json.name|string }} (dz)\",\n
+        \ \"state_topic\": \"homeassistant/sensor/dz_sensor_{{ trigger.payload_json.idx|string
+        }}/state\",\n  \"unit_of_measurement\": \"°C\",\"unique_id\": \"{{ trigger.payload_json.idx
+        }}\"\n}"
+  initial_state: true
+- id: 3657efd252f941a483ca846cd1d1d21e
+  alias: domoticz_utility_sensor
+  trigger:
+  - platform: mqtt
+    topic: domoticz/out
+  condition:
+  - condition: template
+    value_template: '{{ (trigger.payload_json.dtype == "RFXMeter" and trigger.payload_json.stype
+      == "RFXMeter counter") or (trigger.payload_json.dtype == "General" and trigger.payload_json.stype
+      == "Counter Incremental") }}'
+  action:
+  - service: mqtt.publish
+    data_template:
+      topic: homeassistant/sensor/dz_sensor_{{ trigger.payload_json.idx }}/state
+      payload_template: '{{ trigger.payload_json.svalue1 }}'
+  - condition: template
+    value_template: '{{ states("sensor.dz_sensor_"+trigger.payload_json.idx|string)
+      == "unknown" }}'
+  - service: mqtt.publish
+    data_template:
+      topic: homeassistant/sensor/dz_sensor_{{ trigger.payload_json.idx }}/config
+      payload_template: "{ \"name\": \"{{ trigger.payload_json.name|string }} (dz)\",\n
+        \ \"state_topic\": \"homeassistant/sensor/dz_sensor_{{ trigger.payload_json.idx|string
+        }}/state\",\n  \"unit_of_measurement\": \"m³\",\"unique_id\": \"{{ trigger.payload_json.idx
+        }}\"\n}"
+  initial_state: true
+- id: '1708884166221'
+  alias: Purge Database
+  description: Clean the Database
+  trigger:
+  - platform: time
+    at: 02:22:22
+  condition: []
+  action:
+  - service: recorder.purge
+    data:
+      repack: true
+      keep_days: 1
+      apply_filter: true
+  mode: single
+- id: '1708976154895'
+  alias: Update P1 Sensors
+  description: Update sensors every minute to prevent DB overload!
+  trigger:
+  - platform: time_pattern
+    seconds: /30
+  condition: []
+  action:
+  - service: homeassistant.update_entity
+    target:
+      entity_id:
+      - sensor.sensor_actual_return_rate_limit
+      - sensor.sensor_actual_consumption_rate_limit
+    data: {}
+  mode: single
+- id: '1708977246666'
+  alias: Update P1 (Usage Wh)
+  description: Update sensors every minute to prevent DB overload!
+  trigger:
+  - platform: time_pattern
+    minutes: /1
+  condition: []
+  action:
+  - service: homeassistant.update_entity
+    target:
+      entity_id:
+      - sensor.low_tariff_usage_rate_limit
+      - sensor.sensor_high_tariff_usage
+    data: {}
+  mode: single
