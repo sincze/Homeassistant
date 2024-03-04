@@ -1,0 +1,84 @@
+
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+homeassistant:
+  allowlist_external_dirs:
+    - /config
+
+#logger: !include logger.yaml
+#group: !include groups.yaml
+#zone: !include zones.yaml
+#history: !include history.yaml
+#input_boolean: !include input_boolean.yaml
+#input_number: !include input_number.yaml
+#input_select: !include input_select.yaml
+#automation ui: !include automations.yaml
+#automation manual: !include_dir_merge_list automations
+#template: !include_dir_merge_list sensors/templated
+#switch: !include switches.yaml
+#utility_meter: !include utility_meters.yaml
+#cover: !include cover.yaml
+#counter: !include counter.yaml
+#input_text: !include input_text.yaml
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+recorder: !include recorder.yaml
+sensor: !include_dir_merge_list sensors/
+mqtt:
+  sensor: !include_dir_merge_list mqtt/sensor
+  #cover: !include_dir_merge_list mqtt/cover
+  #switch: !include_dir_merge_list mqtt/switches
+  #binary_sensor: !include_dir_merge_list mqtt/binary_sensor
+
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 192.168.xx.xx     # Add the IP address of the proxy server
+#    - 172.30.33.0/24  # You may also provide the subnet mask
+
+
+monitor_docker:
+  - name: Docker
+    containers:
+      - appdaemon
+      - db-dsmr
+      - db-hass
+      - deconz
+      - dsmr
+      - hass
+      - influxdb
+      - mosquitto
+      - nodered
+      - unifi
+    rename:
+      appdaemon: AppDaemon
+      db-dsmr: "Database DSMR-Reader"
+      db-hass: Database Home Assistant
+      deconz: DeCONZ
+      dsmr: "DSMR-Reader"
+      hass: Home Assistant
+      influxdb: InfluxDB
+      mosquitto: Mosquitto
+      nodered: "Node-RED"
+      unifi: UniFi
+    monitored_conditions:
+      - version
+      - containers_running
+      - containers_total
+      - state
+      - status
+      - memory
+
+mqtt_statestream:
+  base_topic: homeassistant/out
+  include:
+    domains:
+      - switch
+      - sensor
+      - binary_sensor
