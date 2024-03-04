@@ -1,0 +1,141 @@
+# ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+# ┃                                          Sensors Configuration                                 ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ File defines various (filtered) sensors to monitor and collect data within Home Assistant.     ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ File: sensors.yaml                                                                             ┃
+# ┃ Created: February 29, 2024                                                                     ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ Note: Please be cautious while editing this file to maintain the correct YAML syntax.          ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ The configuration.yaml contains the following line:                                            ┃
+# ┃ sensor: !include_dir_merge_list sensors/                                                       ┃
+# ┃                                                                                                ┃
+# ┃ As such this file location is  in ./sensors/sensors.yaml                                       ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ For more information, visit: https://www.home-assistant.io/integrations/sensor/                ┃
+# ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+# ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+# ┃                                          FILTERS                                               ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ Filters are used to prevent the HomeAssistant Database from becoming very large                ┃
+# ┃ Filtered nodes do use space in the Database however not as much as unfiltered sensors          ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+    - platform: filter
+      name: "Low Tariff Usage (filtered)"
+      entity_id: sensor.low_tariff_usage
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: low_tariff_filtered_usage_sensor
+
+    - platform: filter
+      name: "High Tariff Usage (filtered)"
+      entity_id: sensor.high_tariff_usage
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: high_tariff_filtered_usage_sensor
+
+    - platform: filter
+      name: "Low Tariff Return (filtered)"
+      entity_id: sensor.low_tariff_return
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: low_tariff_filtered_return_sensor
+
+    - platform: filter
+      name: "High Tariff Return (filtered)"
+      entity_id: sensor.high_tariff_return
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: high_tariff_filtered_return_sensor
+
+    - platform: filter
+      name: "Actual Consumption (filtered)"
+      entity_id: sensor.actual_consumption
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: actual_consumption_filtered_sensor
+
+    - platform: filter
+      name: "Actual Return (filtered)"
+      entity_id: sensor.actual_return
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: actual_return_filtered_sensor
+
+    - platform: filter
+      name: "P1 Current L1 (filtered)"
+      entity_id: sensor.p1_current_l1
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: p1_current_l1_filtered_sensor
+
+    - platform: filter
+      name: "P1 Current L2 (filtered)"
+      entity_id: sensor.p1_current_l2
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: p1_current_l2_filtered_sensor
+
+    - platform: filter
+      name: "P1 Current L3 (filtered)"
+      entity_id: sensor.p1_current_l3
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: p1_current_l3_filtered_sensor
+
+    - platform: filter
+      name: "Usage L1 (filtered)"
+      entity_id: sensor.p1_usage_l1
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: p1_usage_l1_filtered_sensor
+
+    - platform: filter
+      name: "Usage L2 (filtered)"
+      entity_id: sensor.p1_usage_l2
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: p1_usage_l2_filtered_sensor
+
+    - platform: filter
+      name: "Usage L3 (filtered)"
+      entity_id: sensor.p1_usage_l3
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: p1_usage_l3_filtered_sensor
+
+    - platform: filter
+      name: "NEO USG [kWh] (filtered)"
+      entity_id: sensor.neo_usg_electric_consumption_kwh
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: neo_usg_kwh_filtered_sensor
+
+    - platform: filter
+      name: "NEO Kodi Keuken [kWh] (filtered)"
+      entity_id: sensor.plug_kodi_keuken_electric_consumption_kwh
+      filters:
+        - filter: throttle
+          window_size: 10
+      unique_id: neo_kodi_keuken_kwh_filtered_sensor
+
+# -----------------------------------------------------------------------------------------------------------------------
+
