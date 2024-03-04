@@ -1,0 +1,40 @@
+# ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+# ┃                                     MQTT Sensors Configuration                                 ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ This file defines various sensors to monitor and collect data within Home Assistant.           ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ File: omnikinverter.yaml                                                                       ┃
+# ┃ Created: March 03, 2024                                                                        ┃
+# ┃ By: S.Incze                                                                                    ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ Note: Please be cautious while editing this file to maintain the correct YAML syntax.          ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ In my configuration.yaml I have the following directive:                                       ┃
+# ┃                                                                                                ┃
+# ┃ mqtt:                                                                                          ┃ 
+# ┃   sensor: !include_dir_merge_list mqtt/sensor                                                  ┃
+# ┃                                                                                                ┃
+# ┃ This means this file needs to be in /mqtt/sensor subdirectory                                  ┃
+# ┃----------------------------------------------------------------------------------------------- ┃
+# ┃ This file listens to domoticz/out. if Domoticz publishes a sensor and if the name is in the    ┃
+# ┃ value_json.name == '****' corresponds it will use it to create the sensor in HA.               ┃
+# ┃ ---------------------------------------------------------------------------------------------- ┃
+# ┃ For more information, visit: https://www.home-assistant.io/integrations/sensor/                ┃
+# ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+    - name: "Omnik Inverter Power"
+      state_topic: "domoticz/out"
+      unique_id: dom_omnik_watt
+      json_attributes_topic: "domoticz/out"
+      unit_of_measurement: "W"
+      value_template: "{% if value_json.name == 'Omnik Current - Return' %}{{ value_json.svalue1 }}{% endif %}"
+      device_class: power
+
+    - name: "Omnik Inverter Energy"
+      state_topic: "domoticz/out"
+      unique_id: dom_omnik_counter
+      json_attributes_topic: "domoticz/out"
+      unit_of_measurement: "Wh"
+      value_template: "{% if value_json.name == 'Omnik Current - Return' %}{{ value_json.svalue2 }}{% endif %}"
+      device_class: energy
+      state_class:  total_increasing
