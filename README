@@ -1,1 +1,242 @@
-README
+# Home Assistant Backup: Extraction, Decryption & Selective Restore
+
+**Last verified:** 2026-08-13, against a backup created by HA Core 2026.7.4 (SecureTar v3 format).
+
+## When to use this
+
+You have a `.tar` file from Home Assistant's automatic backups (Settings → System → Backups) and need to either recover a single file (a dashboard, an automation, a config entry) without doing a full restore, or inspect the contents for another reason. This does not cover restoring a full instance — use the HA UI's built-in restore for that; it's simpler and lower-risk when a full restore is actually what you want.
+
+## Security note before you start
+
+A decrypted Home Assistant backup contains **plaintext secrets**: `secrets.yaml`, long-lived access tokens and integration API keys in `.storage/`, and anything else your automations reference. Treat the decrypted output like you would any other credentials dump:
+
+- Do the work on a machine you trust, ideally the HA host itself or a machine under your control — not a shared or unmanaged one.
+- Delete the decrypted files (`rm -rf`, or `shred` if you want to be thorough) once you're done — don't leave them sitting in a home directory.
+- Any third-party script you pull from GitHub to help with this (there are several floating around for this exact purpose) should be read through before running it against a file full of credentials. It costs a few minutes; a compromised or careless script has a lot of surface area to work with here.
+
+## Background: two backup formats
+
+Home Assistant's backup encryption changed in **HA 2026.4**:
+
+| | Pre-2026.4 (SecureTar v2) | 2026.4+ (SecureTar v3) |
+|---|---|---|
+| Cipher | AES-128-CBC | XChaCha20-Poly1305 (libsodium secretstream) |
+| Key derivation | Password hashed 100× with SHA-256 | Argon2id |
+| Symptom if you use the wrong tool | `Invalid Magic Bytes` error | Garbled/undecodable manifest, or the same magic-bytes error |
+
+Older community decrypt scripts (AES-CBC only) will fail on anything backed up under 2026.4+. Use the official `securetar` library (below) — it handles both transparently, so you don't need to know or check which version your backup uses.
+
+## Step 1 — Extract the outer container
+
+The outer `.tar` is never itself encrypted; it's a plain tar containing `backup.json` (metadata, also plaintext) plus one or more `.tar.gz`/`.tar` members, one per backed-up component (`homeassistant.tar.gz`, addon archives, `share.tar.gz`, etc.).
+
+```bash
+mkdir -p ~/extracted
+tar -xf Automatic_backup_<version>_<date>_<id>.tar -C ~/extracted
+cd ~/extracted
+ls -l
+cat backup.json   # check the "protected" field — true means the inner archives are encrypted
+```
+
+If `"protected": false`, the inner `.tar.gz` files are plain gzip'd tars — skip straight to Step 4 (extract inner archives) with a normal `tar -xzf`.
+
+## Step 2 — Set up Python (venv)
+
+On Debian/Raspberry Pi OS, `pip install` at the system level will fail with `error: externally-managed-environment` (PEP 668). Don't override this with `--break-system-packages` on a machine that's also running system services (like the HA host) — use a venv instead:
+
+```bash
+sudo apt install -y python3-venv   # if the venv module isn't already present
+python3 -m venv ~/extracted/venv
+source ~/extracted/venv/bin/activate
+pip install securetar
+```
+
+`securetar` is the actual library HA Core/Supervisor uses internally to read and write backups, so it stays correct across format changes — safer than relying on a community reimplementation that may lag behind HA's own changes.
+
+## Step 3 — Decrypt with `decrypt_ha_backup.py`
+
+Script (save as `decrypt_ha_backup.py` in your venv folder):
+
+```python
+#!/usr/bin/env python3
+"""
+Decrypt a Home Assistant backup using the official `securetar` library
+(the same library HA Core/Supervisor uses internally).
+
+Handles both SecureTar v2 (AES-128-CBC, pre-2026.4) and v3
+(XChaCha20-Poly1305 / Argon2id, 2026.4+) formats automatically -
+you don't need to know which one your backup uses.
+
+Usage:
+    python3 decrypt_ha_backup.py <backup.tar> <output_dir> [--password PASSWORD]
+"""
+
+import argparse
+import getpass
+import os
+import sys
+import tarfile
+from pathlib import Path
+
+from securetar import SecureTarArchive
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("backup", type=Path, help="Path to the backup .tar file")
+    parser.add_argument("output_dir", type=Path, help="Directory to write decrypted contents")
+    parser.add_argument("--password", help="Backup password / Emergency Recovery Key")
+    parser.add_argument(
+        "--extract-inner",
+        action="store_true",
+        help="Also extract the decrypted inner .tar/.tar.gz archives into subfolders",
+    )
+    args = parser.parse_args()
+
+    password = args.password or getpass.getpass("Backup password/key: ")
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    with SecureTarArchive(args.backup, "r", password=password) as archive:
+        members = list(archive.tar)
+        print(f"Found {len(members)} entries in the archive.")
+
+        for tar_info in members:
+            print(f" - {tar_info.name} ({tar_info.size} bytes)")
+
+            if not tar_info.isfile():
+                continue
+
+            out_path = args.output_dir / tar_info.name
+
+            if os.path.normpath(tar_info.name) == "backup.json":
+                # The manifest is never encrypted - read it directly.
+                with archive.tar.extractfile(tar_info) as src, open(out_path, "wb") as dst:
+                    dst.write(src.read())
+                continue
+
+            # Validate the password against this member before committing to a
+            # full (potentially large) decrypt.
+            if not archive.validate_password(tar_info):
+                print(f"   !! Password/key rejected for {tar_info.name} - aborting.")
+                return 1
+
+            with archive.extract_tar(tar_info) as decrypted, open(out_path, "wb") as dst:
+                while chunk := decrypted.read(1024 * 1024):
+                    dst.write(chunk)
+
+    print(f"\nDecrypted contents written to: {args.output_dir}")
+
+    if args.extract_inner:
+        for inner in args.output_dir.glob("*.tar*"):
+            if inner.name == "backup.json":
+                continue
+            dest = args.output_dir / inner.stem.replace(".tar", "")
+            dest.mkdir(exist_ok=True)
+            print(f"Extracting {inner.name} -> {dest}")
+            with tarfile.open(inner) as t:
+                # Python 3.12+ has extractall(filter=...); older versions only
+                # support the extraction_filter attribute (if backported).
+                t.extraction_filter = getattr(tarfile, "data_filter", None)
+                t.extractall(dest)
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+Run it:
+
+```bash
+python3 decrypt_ha_backup.py ~/extracted/Automatic_backup_<...>.tar ~/extracted/decrypted --extract-inner --password 'YOUR-BACKUP-PASSWORD-OR-EMERGENCY-KEY'
+```
+
+The password/key is either the password you set when configuring backups, or the Emergency Recovery Key shown under Settings → System → Backups (format like `AAAA-BBBB-CCCC-DDDD-EEEE-FFFF-GGGG-HHHH`).
+
+Output: `decrypted/backup.json` plus one decrypted `.tar.gz` per component, and (with `--extract-inner`) a matching subfolder with the unpacked contents of each.
+
+## Step 4 — Find the file you need
+
+For a Home Assistant config-component backup, the decrypted+extracted tree typically looks like:
+
+```
+decrypted/
+├── backup.json
+├── homeassistant.tar.gz
+└── homeassistant/
+    └── data/                      # may or may not be nested under "data/" depending on backup type
+        ├── configuration.yaml
+        ├── secrets.yaml
+        └── .storage/
+            ├── lovelace                    # default dashboard content
+            ├── lovelace.<url_path>         # additional dashboards, one file per dashboard
+            ├── lovelace_dashboards         # registry: title/icon/url_path per dashboard
+            ├── auth                        # user accounts, tokens
+            └── core.config_entries         # integration configs, often including API keys
+```
+
+Search for what you need, e.g. a dashboard:
+
+```bash
+find ~/extracted/decrypted/homeassistant -iname "lovelace*"
+```
+
+## Step 5 — Restore the single file into the live instance
+
+Locate your live install's `.storage` directory. This varies by install type (Supervised, Core-in-venv, Docker). `.storage/onboarding` always exists on a running instance and is a reliable anchor:
+
+```bash
+sudo find / -xdev -maxdepth 8 -path "*/.storage/onboarding" 2>/dev/null
+```
+
+For a **Docker** install, first confirm the config path is actually a bind mount (so host-side edits land inside the container) rather than a named volume:
+
+```bash
+docker inspect <container_name> --format '{{ json .Mounts }}' | python3 -m json.tool
+```
+
+Look for `"Type": "bind"` with `Destination: /config` — if it's a named volume instead, you'll need to `docker cp` into the container rather than editing the host path directly.
+
+Back up the current file, copy the recovered one over it, and match ownership to the rest of the directory:
+
+```bash
+LIVE_STORAGE=/path/to/live/config/.storage   # from the find command above
+
+sudo cp -v "$LIVE_STORAGE/lovelace.dashboard_default" "$LIVE_STORAGE/lovelace.dashboard_default.bak-$(date +%F)" 2>/dev/null
+sudo cp -v ~/extracted/decrypted/homeassistant/data/.storage/lovelace.dashboard_default "$LIVE_STORAGE/"
+sudo chown --reference="$LIVE_STORAGE/onboarding" "$LIVE_STORAGE/lovelace.dashboard_default"
+```
+
+Restart Home Assistant to pick up the change:
+
+```bash
+docker restart <container_name>        # Docker
+# or
+ha core restart                        # Supervisor CLI
+# or Settings -> System -> Restart from the UI
+```
+
+**If the item is missing entirely** (not just broken/empty) rather than present-but-wrong — e.g. a dashboard that's disappeared from the sidebar completely — restoring the content file alone (`lovelace.<url_path>`) isn't enough. You also need its entry restored in `.storage/lovelace_dashboards`, which is the registry HA uses to know the dashboard exists at all (title, icon, sidebar visibility, url_path).
+
+## Step 6 — Clean up
+
+Once confirmed working:
+
+```bash
+rm -rf ~/extracted/decrypted
+rm -rf ~/extracted/venv
+# consider shred -u instead of rm if the host is shared or the drive isn't full-disk-encrypted
+```
+
+Don't leave a decrypted copy of `secrets.yaml` and `.storage/auth` sitting on disk longer than the task requires.
+
+## Quick troubleshooting reference
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `error: externally-managed-environment` on `pip install` | Debian/PEP 668 protecting system Python | Use a venv (Step 2), don't use `--break-system-packages` on a host running services |
+| `UnicodeDecodeError` reading `backup.json` | Using an AES-128-only (v2) decrypt script against a v3 (2026.4+) backup, or a script bug mismatching the manifest filename | Use `securetar` directly (handles both versions) |
+| Password/key rejected specifically for `backup.json` | Script comparing `tar_info.name` to `"backup.json"` without normalizing the `./` prefix tar sometimes adds | `backup.json` is never encrypted — skip password validation for it entirely |
+| `TypeError: extractall() got an unexpected keyword argument 'filter'` | `filter=` on `extractall()` requires Python 3.12+ | Use `tar.extraction_filter = getattr(tarfile, "data_filter", None)` then call `extractall()` without the kwarg |
+| Dashboard/file restored but still not showing | Only the content file was restored, not its registry entry | Also restore/merge the relevant entry in `.storage/lovelace_dashboards` (or equivalent registry file) |
