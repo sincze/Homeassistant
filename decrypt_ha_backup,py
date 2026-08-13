@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+"""
+Decrypt a Home Assistant backup using the official `securetar` library
+(the same library HA Core/Supervisor uses internally).
+
+Handles both SecureTar v2 (AES-128-CBC, pre-2026.4) and v3
+(XChaCha20-Poly1305 / Argon2id, 2026.4+) formats automatically -
+you don't need to know which one your backup uses.
+
+Usage:
+    python3 decrypt_ha_backup.py <backup.tar> <output_dir> [--password PASSWORD]
+"""
+
+import argparse
+import getpass
+import os
+import sys
+import tarfile
+from pathlib import Path
+
+from securetar import SecureTarArchive
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("backup", type=Path, help="Path to the backup .tar file")
+    parser.add_argument("output_dir", type=Path, help="Directory to write decrypted contents")
+    parser.add_argument("--password", help="Backup password / Emergency Recovery Key")
+    parser.add_argument(
+        "--extract-inner",
+        action="store_true",
+        help="Also extract the decrypted inner .tar/.tar.gz archives into subfolders",
+    )
+    args = parser.parse_args()
+
+    password = args.password or getpass.getpass("Backup password/key: ")
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    with SecureTarArchive(args.backup, "r", password=password) as archive:
+        members = list(archive.tar)
+        print(f"Found {len(members)} entries in the archive.")
+
+        for tar_info in members:
+            print(f" - {tar_info.name} ({tar_info.size} bytes)")
+
+            if not tar_info.isfile():
+                continue
+
+            out_path = args.output_dir / tar_info.name
+
+            if os.path.normpath(tar_info.name) == "backup.json":
+                # The manifest is never encrypted - read it directly.
+                with archive.tar.extractfile(tar_info) as src, open(out_path, "wb") as dst:
+                    dst.write(src.read())
+                continue
+
+            # Validate the password against this member before committing to a
+            # full (potentially large) decrypt.
+            if not archive.validate_password(tar_info):
+                print(f"   !! Password/key rejected for {tar_info.name} - aborting.")
+                return 1
+
+            with archive.extract_tar(tar_info) as decrypted, open(out_path, "wb") as dst:
+                while chunk := decrypted.read(1024 * 1024):
+                    dst.write(chunk)
+
+    print(f"\nDecrypted contents written to: {args.output_dir}")
+
+    if args.extract_inner:
+        for inner in args.output_dir.glob("*.tar*"):
+            if inner.name == "backup.json":
+                continue
+            dest = args.output_dir / inner.stem.replace(".tar", "")
+            dest.mkdir(exist_ok=True)
+            print(f"Extracting {inner.name} -> {dest}")
+            with tarfile.open(inner) as t:
+                # Python 3.12+ has extractall(filter=...); older versions only
+                # support the extraction_filter attribute (if backported).
+                t.extraction_filter = getattr(tarfile, "data_filter", None)
+                t.extractall(dest)
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
